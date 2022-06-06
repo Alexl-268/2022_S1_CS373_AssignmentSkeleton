@@ -1,3 +1,4 @@
+from cProfile import label
 import math
 import sys
 from pathlib import Path
@@ -221,7 +222,7 @@ def main():
     SHOW_DEBUG_FIGURES = True
 
     # this is the default input image filename
-    input_filename = "numberplate5.png"
+    input_filename = "numberplate1.png"
 
     if command_line_arguments != []:
         input_filename = command_line_arguments[0]
@@ -254,29 +255,35 @@ def main():
     # STUDENT IMPLEMENTATION here
 
     px_array = computeRGBToGreyscale(px_array_r, px_array_g, px_array_b, image_width, image_height)
-    px_array = scaleTo0And255AndQuantize(px_array, image_width, image_height)
-    px_array = computeStandardDeviationImage5x5(px_array, image_width, image_height)
-    px_array = computeThresholdGE(px_array, 60, image_width, image_height)
+    compute_array = scaleTo0And255AndQuantize(px_array, image_width, image_height)
+    compute_array = computeStandardDeviationImage5x5(compute_array, image_width, image_height)
+    compute_array = computeThresholdGE(compute_array, 60, image_width, image_height)
     for i in range(5):
-        px_array = computeDilation8Nbh3x3FlatSE(px_array, image_width, image_height)
+        compute_array = computeDilation8Nbh3x3FlatSE(compute_array, image_width, image_height)
     for i in range(5):
-        px_array = computeErosion8Nbh3x3FlatSE(px_array, image_width, image_height)
-    (px_array_lables, px_size) = computeConnectedComponentLabeling(px_array, image_width, image_height)
-    px_array = px_array_lables
+        compute_array = computeErosion8Nbh3x3FlatSE(compute_array, image_width, image_height)
+    (px_array_lables, px_size) = computeConnectedComponentLabeling(compute_array, image_width, image_height)
     sizeDict = sorted(px_size.items(), key=lambda item: item[1], reverse=True)
 
     top = 0
     bottom = image_height
     left = image_width
     right = 0
+    detectPlate = True
+    labelToDetect = 0
 
-    for y in range(image_height):
-        for x in range(image_width):
-            if px_array_lables[y][x] == sizeDict[0][0]:
-                top = max(top, y)
-                bottom = min(bottom, y)
-                left = min(left, x)
-                right = max(right, x)
+    while detectPlate:
+        for y in range(image_height):
+            for x in range(image_width):
+                if px_array_lables[y][x] == sizeDict[labelToDetect][0]:
+                    top = max(top, y)
+                    bottom = min(bottom, y)
+                    left = min(left, x)
+                    right = max(right, x)
+        if ((right-left)/(top-bottom)) > 1.5 and ((right-left)/(top-bottom)) < 5:
+            detectPlate = False
+        else:
+            labelToDetect += 1
 
 
     # print(top,bottom,left,right,sizeDict[0][0])
