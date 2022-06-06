@@ -222,7 +222,7 @@ def main():
     SHOW_DEBUG_FIGURES = True
 
     # this is the default input image filename
-    input_filename = "numberplate1.png"
+    input_filename = "numberplate3.png"
 
     if command_line_arguments != []:
         input_filename = command_line_arguments[0]
@@ -264,15 +264,14 @@ def main():
         compute_array = computeErosion8Nbh3x3FlatSE(compute_array, image_width, image_height)
     (px_array_lables, px_size) = computeConnectedComponentLabeling(compute_array, image_width, image_height)
     sizeDict = sorted(px_size.items(), key=lambda item: item[1], reverse=True)
-
-    top = 0
-    bottom = image_height
-    left = image_width
-    right = 0
     detectPlate = True
     labelToDetect = 0
 
     while detectPlate:
+        top = 0
+        bottom = image_height
+        left = image_width
+        right = 0
         for y in range(image_height):
             for x in range(image_width):
                 if px_array_lables[y][x] == sizeDict[labelToDetect][0]:
