@@ -55,6 +55,23 @@ def createInitializedGreyscalePixelArray(image_width, image_height, initValue = 
     return new_array
 
 # --------------------------------------------------------------------------------------------------------------Helper Methods 
+
+class Queue:
+    def __init__(self):
+        self.items = []
+
+    def isEmpty(self):
+        return self.items == []
+
+    def enqueue(self, item):
+        self.items.insert(0,item)
+
+    def dequeue(self):
+        return self.items.pop()
+
+    def size(self):
+        return len(self.items)
+
 def computeRGBToGreyscale(pixel_array_r, pixel_array_g, pixel_array_b, image_width, image_height):
     greyscale_pixel_array = createInitializedGreyscalePixelArray(image_width, image_height)
     
@@ -118,6 +135,82 @@ def computeStandardDeviationImage5x5(pixel_array, image_width, image_height):
             returnArray[row][col]=stdeviation
     return returnArray
 
+def computeThresholdGE(pixel_array, threshold_value, image_width, image_height):
+    
+    for width in range(image_width):
+        for height in range(image_height):
+            pixel = pixel_array[height][width]
+            if (pixel < threshold_value):
+                pixel_array[height][width] = 0
+            else:
+                pixel_array[height][width] = 255
+        
+    return pixel_array
+
+def computeDilation8Nbh3x3FlatSE(pixel_array, image_width, image_height):
+    outputMatrix = [([0]*(image_width)) for i in range(image_height)]
+    for row in range(1, image_height-1):
+        for col in range(1, image_width-1):
+            hit = 0
+            for horozontalProbe in range(-1,2):
+                for verticalProbe in range(-1,2):
+                    if (pixel_array[row+horozontalProbe][col+verticalProbe] > 0):
+                        hit = 1
+            outputMatrix[row][col] = hit
+    return outputMatrix
+
+def computeErosion8Nbh3x3FlatSE(pixel_array, image_width, image_height):
+    outputMatrix = [([0]*(image_width)) for i in range(image_height)]
+    for row in range(1, image_height-1):
+        for col in range(1, image_width-1):
+            fit = 1
+            for horozontalProbe in range(-1,2):
+                for verticalProbe in range(-1,2):
+                    if (pixel_array[row+horozontalProbe][col+verticalProbe] == 0):
+                        fit = 0
+            outputMatrix[row][col] = fit
+    return outputMatrix
+
+def breadthFirstSearch(pixel_array, outputMatrix, outputDict, visited,  i, j, image_height, image_width, label):
+    queue = Queue()
+    queue.enqueue([i, j])
+    visited[i][j] = True
+    outputDict[label] += 1
+
+    x = [-1, 1, 0, 0]
+    y = [0, 0, -1, 1]
+
+    while (not queue.isEmpty()):
+        location = queue.dequeue()
+        row = location[0]
+        col = location[1]
+        outputMatrix[row][col] = label
+
+        for k in range(4):
+            vertProbe = row + x[k]
+            horoProbe = col + y[k]
+
+            if ((vertProbe >= 0) and (horoProbe >= 0) and (vertProbe < image_height) and (horoProbe < image_width) and (visited[vertProbe][horoProbe] == False) and (pixel_array[vertProbe][horoProbe] > 0)):
+                queue.enqueue([vertProbe, horoProbe])
+                visited[vertProbe][horoProbe] = True
+                outputDict[label] += 1
+
+def computeConnectedComponentLabeling(pixel_array, image_width, image_height):
+    outputMatrix = [([0]*(image_width)) for i in range(image_height)]
+    outputDict = {}
+    visited = [[False for x in range(image_width)] for y in range(image_height)] 
+    label = 0
+
+    for i in range(image_height):
+        for j in range(image_width):
+            if ((visited[i][j] == False) & (pixel_array[i][j] > 0)):
+                label += 1
+                outputDict[label] = 0
+                breadthFirstSearch(pixel_array, outputMatrix,
+                                   outputDict, visited,  i, j, image_height, image_width, label)
+
+    return (outputMatrix, outputDict)
+
 # This is our code skeleton that performs the license plate detection.
 # Feel free to try it on your own images of cars, but keep in mind that with our algorithm developed in this lecture,
 # we won't detect arbitrary or difficult to detect license plates!
@@ -163,14 +256,39 @@ def main():
     px_array = computeRGBToGreyscale(px_array_r, px_array_g, px_array_b, image_width, image_height)
     px_array = scaleTo0And255AndQuantize(px_array, image_width, image_height)
     px_array = computeStandardDeviationImage5x5(px_array, image_width, image_height)
+    px_array = computeThresholdGE(px_array, 60, image_width, image_height)
+    for i in range(5):
+        px_array = computeDilation8Nbh3x3FlatSE(px_array, image_width, image_height)
+    for i in range(5):
+        px_array = computeErosion8Nbh3x3FlatSE(px_array, image_width, image_height)
+    (px_array_lables, px_size) = computeConnectedComponentLabeling(px_array, image_width, image_height)
+    px_array = px_array_lables
+    sizeDict = sorted(px_size.items(), key=lambda item: item[1], reverse=True)
+
+    top = 0
+    bottom = image_height
+    left = image_width
+    right = 0
+
+    for y in range(image_height):
+        for x in range(image_width):
+            if px_array_lables[y][x] == sizeDict[0][0]:
+                top = max(top, y)
+                bottom = min(bottom, y)
+                left = min(left, x)
+                right = max(right, x)
+
+
+    # print(top,bottom,left,right,sizeDict[0][0])
+    # for i in range(len(sizeDict)):
+
+
 
     # compute a dummy bounding box centered in the middle of the input image, and with as size of half of width and height
-    center_x = image_width / 2.0
-    center_y = image_height / 2.0
-    bbox_min_x = center_x - image_width / 4.0
-    bbox_max_x = center_x + image_width / 4.0
-    bbox_min_y = center_y - image_height / 4.0
-    bbox_max_y = center_y + image_height / 4.0
+    bbox_min_x = left
+    bbox_max_x = right
+    bbox_min_y = bottom
+    bbox_max_y = top
 
 
 
