@@ -54,7 +54,69 @@ def createInitializedGreyscalePixelArray(image_width, image_height, initValue = 
     new_array = [[initValue for x in range(image_width)] for y in range(image_height)]
     return new_array
 
+# --------------------------------------------------------------------------------------------------------------Helper Methods 
+def computeRGBToGreyscale(pixel_array_r, pixel_array_g, pixel_array_b, image_width, image_height):
+    greyscale_pixel_array = createInitializedGreyscalePixelArray(image_width, image_height)
+    
+    for row in range(image_height):
+        for col in range(image_width):
+            red = 0.299*pixel_array_r[row][col]
+            green = 0.587*pixel_array_g[row][col]
+            blue = 0.114*pixel_array_b[row][col]
+            greyscale_pixel_array[row][col] = round(red+green+blue)
+            
+    return greyscale_pixel_array
 
+def scaleTo0And255AndQuantize(pixel_array, image_width, image_height):
+    returnArray = createInitializedGreyscalePixelArray(image_width, image_height)
+    minVal = 255
+    maxVal = 0
+
+    for width in range(0,image_width):
+        for height in range(image_height):
+            if pixel_array[height][width] < minVal:
+                minVal = pixel_array[height][width]
+            elif pixel_array[height][width] > maxVal:
+                maxVal = pixel_array[height][width]
+
+    for width in range(0,image_width):
+        for height in range(image_height):
+            if maxVal-minVal != 0:
+
+                sout = (pixel_array[height][width]-minVal) * (((255-0)/(maxVal-minVal)))
+
+                if sout < 0:
+                    returnArray[height][width] = 0
+                elif sout > 255:
+                    returnArray[height][width] = 255
+                else:
+                    returnArray[height][width] = round(sout)
+    
+    return returnArray
+
+def computeStandardDeviationImage5x5(pixel_array, image_width, image_height):
+    returnArray = createInitializedGreyscalePixelArray(image_width, image_height)
+
+    for row in range(2,image_height-2):
+        for col in range(2, image_width-2):
+            valueList = []
+            for horoCycle in range(-2,3):
+                for vertCycle in range(-2,3):
+                    pixelValue = pixel_array[row+vertCycle][horoCycle+col]
+                    valueList.append(pixelValue)
+            valueList = sorted(valueList)
+            median = 0
+            for i in range(len(valueList)):
+                median += valueList[i]
+            median = median/len(valueList)
+
+            stdeviation = 0
+            for i in range(len(valueList)):
+                stdeviation += (valueList[i]-median)*(valueList[i]-median)
+            
+            stdeviation = math.sqrt((stdeviation/25))
+            returnArray[row][col]=stdeviation
+    return returnArray
 
 # This is our code skeleton that performs the license plate detection.
 # Feel free to try it on your own images of cars, but keep in mind that with our algorithm developed in this lecture,
@@ -66,7 +128,7 @@ def main():
     SHOW_DEBUG_FIGURES = True
 
     # this is the default input image filename
-    input_filename = "numberplate1.png"
+    input_filename = "numberplate5.png"
 
     if command_line_arguments != []:
         input_filename = command_line_arguments[0]
@@ -98,7 +160,9 @@ def main():
 
     # STUDENT IMPLEMENTATION here
 
-    px_array = px_array_r
+    px_array = computeRGBToGreyscale(px_array_r, px_array_g, px_array_b, image_width, image_height)
+    px_array = scaleTo0And255AndQuantize(px_array, image_width, image_height)
+    px_array = computeStandardDeviationImage5x5(px_array, image_width, image_height)
 
     # compute a dummy bounding box centered in the middle of the input image, and with as size of half of width and height
     center_x = image_width / 2.0
