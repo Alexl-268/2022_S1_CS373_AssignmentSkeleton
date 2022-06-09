@@ -90,18 +90,18 @@ def scaleTo0And255AndQuantize(pixel_array, image_width, image_height):
     minVal = 255
     maxVal = 0
 
-    for width in range(0,image_width):
+    for width in range(image_width):
         for height in range(image_height):
             if pixel_array[height][width] < minVal:
                 minVal = pixel_array[height][width]
             elif pixel_array[height][width] > maxVal:
                 maxVal = pixel_array[height][width]
 
-    for width in range(0,image_width):
+    for width in range(image_width):
         for height in range(image_height):
             if maxVal-minVal != 0:
 
-                sout = (pixel_array[height][width]-minVal) * (((255-0)/(maxVal-minVal)))
+                sout = (pixel_array[height][width]-minVal) * (((255)/(maxVal-minVal)))
 
                 if sout < 0:
                     returnArray[height][width] = 0
@@ -114,26 +114,21 @@ def scaleTo0And255AndQuantize(pixel_array, image_width, image_height):
 
 def computeStandardDeviationImage5x5(pixel_array, image_width, image_height):
     returnArray = createInitializedGreyscalePixelArray(image_width, image_height)
-
     for row in range(2,image_height-2):
-        for col in range(2, image_width-2):
-            valueList = []
-            for horoCycle in range(-2,3):
-                for vertCycle in range(-2,3):
-                    pixelValue = pixel_array[row+vertCycle][horoCycle+col]
-                    valueList.append(pixelValue)
-            valueList = sorted(valueList)
-            median = 0
-            for i in range(len(valueList)):
-                median += valueList[i]
-            median = median/len(valueList)
+        for col in range(2,image_width-2):
+            mean = 0
+            for yCycle in range(row-2,3+row):
+                for xCycle in range(col-2,3+col):
+                    mean += pixel_array[yCycle][xCycle]
+            mean = mean / 25
 
-            stdeviation = 0
-            for i in range(len(valueList)):
-                stdeviation += (valueList[i]-median)*(valueList[i]-median)
+            for yCycle in range(row-2,3+row):
+                for xCycle in range(col-2,3+col):
+                    returnArray[row][col] += (pixel_array[yCycle][xCycle] - mean) ** 2
             
-            stdeviation = math.sqrt((stdeviation/25))
-            returnArray[row][col]=stdeviation
+            returnArray[row][col] = returnArray[row][col] / 25
+            returnArray[row][col] = math.sqrt(returnArray[row][col])
+
     return returnArray
 
 def computeThresholdGE(pixel_array, threshold_value, image_width, image_height):
@@ -222,7 +217,7 @@ def main():
     SHOW_DEBUG_FIGURES = True
 
     # this is the default input image filename
-    input_filename = "numberplate3.png"
+    input_filename = "numberplate4.png"
 
     if command_line_arguments != []:
         input_filename = command_line_arguments[0]
@@ -254,20 +249,25 @@ def main():
 
     # STUDENT IMPLEMENTATION here
 
+    threshold = 150
     px_array = computeRGBToGreyscale(px_array_r, px_array_g, px_array_b, image_width, image_height)
     compute_array = scaleTo0And255AndQuantize(px_array, image_width, image_height)
     compute_array = computeStandardDeviationImage5x5(compute_array, image_width, image_height)
-    compute_array = computeThresholdGE(compute_array, 60, image_width, image_height)
-    for i in range(5):
+    compute_array = scaleTo0And255AndQuantize(compute_array, image_width, image_height)
+    compute_array = computeThresholdGE(compute_array, threshold, image_width, image_height)
+    for i in range(4):
         compute_array = computeDilation8Nbh3x3FlatSE(compute_array, image_width, image_height)
-    for i in range(5):
+    for i in range(4):
         compute_array = computeErosion8Nbh3x3FlatSE(compute_array, image_width, image_height)
     (px_array_lables, px_size) = computeConnectedComponentLabeling(compute_array, image_width, image_height)
     sizeDict = sorted(px_size.items(), key=lambda item: item[1], reverse=True)
-    detectPlate = True
     labelToDetect = 0
-
-    while detectPlate:
+    
+    top = 0
+    bottom = image_height
+    left = image_width
+    right = 0
+    for labelToDetect in range(len(sizeDict)):
         top = 0
         bottom = image_height
         left = image_width
@@ -279,26 +279,16 @@ def main():
                     bottom = min(bottom, y)
                     left = min(left, x)
                     right = max(right, x)
-        if ((right-left)/(top-bottom)) > 1.5 and ((right-left)/(top-bottom)) < 5:
-            detectPlate = False
-        else:
-            labelToDetect += 1
-
-
-    # print(top,bottom,left,right,sizeDict[0][0])
-    # for i in range(len(sizeDict)):
-
-
+        if (top-bottom != 0):
+            if ((right-left)/(top-bottom)) > 1.5 and ((right-left)/(top-bottom)) < 5:
+                break
 
     # compute a dummy bounding box centered in the middle of the input image, and with as size of half of width and height
+    
     bbox_min_x = left
     bbox_max_x = right
     bbox_min_y = bottom
     bbox_max_y = top
-
-
-
-
 
     # Draw a bounding box as a rectangle into the input image
     axs1[1, 1].set_title('Final image of detection')
