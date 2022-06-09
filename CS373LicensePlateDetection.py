@@ -217,7 +217,7 @@ def main():
     SHOW_DEBUG_FIGURES = True
 
     # this is the default input image filename
-    input_filename = "numberplate4.png"
+    input_filename = "1numberplate.png"
 
     if command_line_arguments != []:
         input_filename = command_line_arguments[0]
